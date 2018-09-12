@@ -16,7 +16,7 @@ To change colors on the module (Neopixels on Pin 2), simply go to the root URL o
 //#include <ESP8266mDNS.h> 
 #include <FastLED.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include <WiFiManager.h>
+// #include <WiFiManager.h>
 #include <Hash.h>
 
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -29,6 +29,10 @@ CRGB leds[NUM_LEDS];
 
 uint8_t gHue = 0;
 int mode = 0;
+
+const char* ssid = "C3P";
+const char* password = "trespatios";
+int contconexion = 0;
 
 String pagina ="<html>"
 "<head>"
@@ -105,12 +109,48 @@ void setup() {
 
     Serial.println();
 
-    WiFiManager wifiManager;
-    wifiManager.autoConnect("AutoConnectAP");
+    //WiFiManager wifiManager;
+   
+    //wifiManager.setAPStaticIPConfig( IPAddress(192,168,0,178), IPAddress(192,168,0,1), IPAddress(255,255,255,0));
 
-    delay(2000);
+    /* if (!wifiManager.autoConnect("AutoConnectAP", "password")) {
+    Serial.println("failed to connect, we should reset as see if it connects");
+    delay(3000);
+    ESP.reset();
+    delay(5000);
+    }
+    */
+    //delay(2000);
+    //Serial.println("Connection established!");
+    // Serial.println("local ip");
+    //Serial.println(WiFi.localIP());
 
-    Serial.println("Connection established!");
+  // nos conectamos a la web
+    WiFi.mode(WIFI_STA); //para que no inicie el SoftAP en el modo normal
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED and contconexion <50) { //Cuenta hasta 50 si no se puede conectar lo cancela
+        ++contconexion;
+
+    delay(500);
+    Serial.print(".");
+  }
+  if (contconexion <50) {
+      //para usar con ip fija
+      IPAddress Ip(192,168,0,178); // no ilvidar configurar segun como este ip 
+      IPAddress Gateway(192,168,0,1); 
+      IPAddress Subnet(255,255,255,0); 
+      WiFi.config(Ip, Gateway, Subnet); 
+      
+      Serial.println("");
+      Serial.println("WiFi conectado");
+      Serial.println(WiFi.localIP());
+  }
+  else { 
+      Serial.println("");
+      Serial.println("Error de conexion");
+  }
+
+  
     FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
