@@ -1,24 +1,34 @@
+/*
+
+When the sketch is uploaded, the ESP8266 will reboot and create its own access point called AutoConnect AP. Connecting to that AP will bring up the 
+list of available access points. Enter Username and PW for the access point and ESP module will save the credentials for you. 
+
+When the module is restarted, it will connect to the AP that you chose and should be available on the network. You can get its IP from the Serial monitor 
+or use mDNS library (it's uncommented by default, along with all usage of the library) to make the module discoverable.
+
+To change colors on the module (Neopixels on Pin 2), simply go to the root URL of the web server.
+
+*/
 #include <ESP8266WiFi.h>
+#include <WiFiClient.h>
 #include <WebSocketsServer.h>
 #include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
+//#include <ESP8266mDNS.h> 
 #include <FastLED.h>
+#include <ESP8266HTTPUpdateServer.h>
+#include <WiFiManager.h>
+#include <Hash.h>
 
-// matrix de leds
-#define NUM_LEDS 1
+WebSocketsServer webSocket = WebSocketsServer(81);
+ESP8266WebServer server(80);
+ESP8266HTTPUpdateServer httpUpdater;
+
+#define NUM_LEDS 64
 #define DATA_PIN D6
-
 CRGB leds[NUM_LEDS];
 
-/*
-#define LED_RED     05 // D1
-#define LED_GREEN   12 // D6
-#define LED_BLUE    13 // D7
-*/
-
-const char* ssid = "C3P";
-const char* password = "trespatios";
-int contconexion = 0;
+uint8_t gHue = 0;
+int mode = 0;
 
 String pagina ="<html>"
 "<head>"
@@ -34,7 +44,7 @@ String pagina ="<html>"
 " if(r.length < 2) { r = '0' + r; }"
 " if(g.length < 2) { g = '0' + g; }"
 " if(b.length < 2) { b = '0' + b; }"
-" var rgb = '0x'+r+g+b;"
+" var rgb = '#'+r+g+b;"
 " console.log('RGB: ' + rgb);"
 " connection.send(rgb);"
 "}"
@@ -48,122 +58,83 @@ String pagina ="<html>"
 "</body>"
 "</html>";
 
-ESP8266WebServer server(80);
-WebSocketsServer webSocket = WebSocketsServer(81);
-
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
 
     switch(type) {
         case WStype_DISCONNECTED:
             Serial.printf("[%u] Disconnected!\n", num);
             break;
-        case WStype_CONNECTED: {
-            IPAddress ip = webSocket.remoteIP(num);
-            Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-
-            // send message to client
-            webSocket.sendTXT(num, "Connected");
-        }
+        case WStype_CONNECTED:
+            {
+                IPAddress ip = webSocket.remoteIP(num);
+                Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+                mode = 0;
+                // send message to client
+                webSocket.sendTXT(num, "Connected");
+            }
             break;
         case WStype_TEXT:
             Serial.printf("[%u] get Text: %s\n", num, payload);
-
-            if(payload[0] == '0x') {
-                // we get RGB data
-
-                // decode rgb data
-                uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);
-                Serial.print("RGB PRINT: ");
-                
-                //Serial.println(rgb);
-                
-                int r = abs(255 - (rgb >> 16) & 0xFF) ;
-                int g =  abs(255 - (rgb >>  8) & 0xFF) ;
-                int b = abs(255 - (rgb >>  0) & 0xFF) ;
-                
-                
-                leds[0] = r+g+b; 
-                FastLED.show(); 
-                delay(500); 
-                // Now turn the LED off, then pause
-                
-                leds[0] = 0x000000;
-                FastLED.show();
-                delay(500); 
-                
+            //USE.SERIAL.printf("First character of the paylod %s\n", payload[0]);
+            for(int i = 0; i < NUM_LEDS; i++) {
+              //(int) strtol( &payload, NULL, 16);
+              uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);
+              leds[i] = rgb; //(long) strtol(&payload[1], NULL, 16);
             }
+
+            // send message to client
+            // webSocket.sendTXT(num, "message here");
+
+            // send data to all connected clients
+            // webSocket.broadcastTXT("message here");
+            break;
+        case WStype_BIN:
+            Serial.printf("[%u] get binary lenght: %u\n", num, lenght);
+            hexdump(payload, lenght);
+
+            // send message to client
+            // webSocket.sendBIN(num, payload, lenght);
             break;
     }
+
 }
 
 void setup() {
-  
-  Serial.begin(115200);
+    Serial.begin(115200);
+    Serial.setDebugOutput(true);
 
-  // martix leds
-  FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
+    Serial.println();
 
-  Serial.println();
+    WiFiManager wifiManager;
+    wifiManager.autoConnect("AutoConnectAP");
 
-  WiFi.mode(WIFI_STA); //para que no inicie el SoftAP en el modo normal
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED and contconexion <50) { //Cuenta hasta 50 si no se puede conectar lo cancela
-    ++contconexion;
-    delay(500);
-    Serial.print(".");
-  }
-  if (contconexion <50) {
-      //para usar con ip fija
-      IPAddress Ip(192,168,0,178); 
-      IPAddress Gateway(192,168,0,1); 
-      IPAddress Subnet(255,255,255,0); 
-      WiFi.config(Ip, Gateway, Subnet); 
-      
-      Serial.println("");
-      Serial.println("WiFi conectado");
-      Serial.println(WiFi.localIP());
-  }
-  else { 
-      Serial.println("");
-      Serial.println("Error de conexion");
-  }
+    delay(2000);
 
-/*
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
-*/
+    Serial.println("Connection established!");
+    FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    
+    //if(MDNS.begin("esp8266")) {
+    //    Serial.println("MDNS responder started");
+    //}
 
-  // start webSocket server
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
+    // handle index
+    server.on("/", []() {
+        server.send(200,"text/html", pagina);
+    });
 
-  if(MDNS.begin("esp8266")) {
-    Serial.println("MDNS responder started");
-  }
+    httpUpdater.setup(&server);
+    server.begin();
 
-  // handle index
-  server.on("/", []() {
-      server.send(200, "text/html", pagina);
-  });
-
-  server.begin();
-
-  // Add service to MDNS
-  MDNS.addService("http", "tcp", 80);
-  MDNS.addService("ws", "tcp", 81);
-
-  /*
-  digitalWrite(LED_RED,   1); // 1 = apagado
-  digitalWrite(LED_GREEN, 1);
-  digitalWrite(LED_BLUE,  1);
-  */
-
-  analogWriteRange(255);
-
+    // Add service to MDNS
+    //MDNS.addService("http", "tcp", 80);
+    //MDNS.addService("ws", "tcp", 81);
 }
 
 void loop() {
     webSocket.loop();
-    server.handleClient();
+    server.handleClient();  
+    FastLED.show();
+    FastLED.delay(1000/120);
 }
