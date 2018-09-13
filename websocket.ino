@@ -25,7 +25,20 @@ ESP8266HTTPUpdateServer httpUpdater;
 
 #define NUM_LEDS 64
 #define DATA_PIN D6
+
 CRGB leds[NUM_LEDS];
+
+int corazon[NUM_LEDS] = {
+  0, 0, 0, 0, 0, 0, 0, 0,  
+  0, 0, 1, 0, 0, 1, 0, 0,
+  0, 1, 0, 1, 1, 0, 1, 0,
+  0, 1, 0, 0, 0, 0, 1, 0,
+  0, 1, 0, 0, 0, 0, 1, 0,
+  0, 0, 1, 0, 0, 1, 0, 0,
+  0, 0, 0, 1, 1, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0,
+};
+
 
 uint8_t gHue = 0;
 int mode = 0;
@@ -80,11 +93,26 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         case WStype_TEXT:
             Serial.printf("[%u] get Text: %s\n", num, payload);
             //USE.SERIAL.printf("First character of the paylod %s\n", payload[0]);
+
+           
+            
             for(int i = 0; i < NUM_LEDS; i++) {
               //(int) strtol( &payload, NULL, 16);
               uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);
-              leds[i] = rgb; //(long) strtol(&payload[1], NULL, 16);
+              
+              //leds[i] = rgb; //(long) strtol(&payload[1], NULL, 16);
+
+              // pinto un corazón
+              // con un array de int donde tenga 1 le asigna a la matrix, cero asigna color negro, nada
+              if(corazon[i] == 1){
+                leds[i] = rgb;
+              } else {
+                leds[i] = 0x000000;
+              }
+              
+              
             }
+            
 
             // send message to client
             // webSocket.sendTXT(num, "message here");
