@@ -42,9 +42,11 @@ int corazon[NUM_LEDS] = {
 
 uint8_t gHue = 0;
 int mode = 0;
-
+uint8_t * payloadArray;
 const char* ssid = "C3P";
 const char* password = "trespatios";
+//const char* ssid = "UNE_6EB4";
+//const char* password = "9857312100";
 int contconexion = 0;
 
 String pagina ="<html>"
@@ -62,8 +64,21 @@ String pagina ="<html>"
 " if(g.length < 2) { g = '0' + g; }"
 " if(b.length < 2) { b = '0' + b; }"
 " var rgb = '#'+r+g+b;"
+" var corazon = ["
+"  0, 0, 0, 0, 0, 0, 0, 0,  "
+"  0, 0, 1, 0, 0, 1, 0, 0,"
+"  0, 1, 0, 1, 1, 0, 1, 0,"
+"  0, 1, 0, 0, 1, 0, 1, 0,"
+"  0, 1, 0, 0, 1, 0, 1, 0,"
+"  0, 0, 1, 0, 1, 1, 0, 0,"
+"  0, 0, 0, 1, 1, 0, 0, 0,"
+"  0, 0, 0, 0, 0, 0, 0, 0,"
+" ];"
+" var corazontexto = corazon.toString();"
 " console.log('RGB: ' + rgb);"
-" connection.send(rgb);"
+" console.log('array puro: ' + corazon);"
+" console.log('array tranform: ' + corazontexto);"
+" connection.send(corazontexto);"
 "}"
 "</script>"
 "</head>"
@@ -74,7 +89,6 @@ String pagina ="<html>"
 "B: <input id='b' type='range' min='0' max='255' step='1' value='0'oninput='sendRGB();'/><br/>"
 "</body>"
 "</html>";
-
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
 
     switch(type) {
@@ -93,27 +107,41 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         case WStype_TEXT:
             Serial.printf("[%u] get Text: %s\n", num, payload);
             //USE.SERIAL.printf("First character of the paylod %s\n", payload[0]);
-
-           
+            //payloadArray = &payload[0];
+            /*
+            for(int i=0; i < NUM_LEDS; i++){
+                //corazon[i] = payload[i];
+                String wtf = (const char*) &payload;
+                 if(wtf == ",") Serial.println("upcoming number");
+                long swiche = strtol((const char *) &payload,NULL,16);
+                Serial.print("valor convertido       ");
+                Serial.println(swiche);
+                 Serial.print("valor payload       ");
+                Serial.println(wtf); 
+              }
+            */
             
-            for(int i = 0; i < NUM_LEDS; i++) {
+           // for(int i = 0; i < NUM_LEDS; i++) {
               //(int) strtol( &payload, NULL, 16);
-              uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);
-              
-              //leds[i] = rgb; //(long) strtol(&payload[1], NULL, 16);
-
+             // uint32_t rgb = (uint32_t) strtol((const char *) &payload[1], NULL, 16);
+             
+              // leds[i] = rgb; //(long) strtol(&payload[1], NULL, 16);
+              // corazon[i] = rgb; 
               // pinto un corazón
               // con un array de int donde tenga 1 le asigna a la matrix, cero asigna color negro, nada
-              if(corazon[i] == 1){
-                leds[i] = rgb;
-              } else {
-                leds[i] = 0x000000;
-              }
               
+              //if(corazon[i] == 1){
+                //leds[i] = 0xAB01EE;
+                //leds[i] = rgb;
+              //} else {
+              //  leds[i] = 0x000000;
+              //}
               
-            }
+             // Serial.println("Viene del websocket parseado: ");
+             // Serial.println(rgb);
+              
+           // }
             
-
             // send message to client
             // webSocket.sendTXT(num, "message here");
 
@@ -164,8 +192,8 @@ void setup() {
   }
   if (contconexion <50) {
       //para usar con ip fija
-      IPAddress Ip(192,168,0,178); // no ilvidar configurar segun como este ip 
-      IPAddress Gateway(192,168,0,1); 
+      IPAddress Ip(192,168,1,178); // no ilvidar configurar segun como este ip 
+      IPAddress Gateway(192,168,1,1); 
       IPAddress Subnet(255,255,255,0); 
       WiFi.config(Ip, Gateway, Subnet); 
       
@@ -206,3 +234,4 @@ void loop() {
     FastLED.show();
     FastLED.delay(1000/120);
 }
+
